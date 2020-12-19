@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" style = 'overflow-y:hidden'>
+<head>
+    <meta charset="UTF-8">
+    <title>Gourmet Comparison</title>
+    <link rel="stylesheet" href="./node_modules/bulma/css/bulma.css">
+    <link rel="stylesheet" href="./darkly.min.css">
+    <style>
+        body{
+            overflow: hidden;
+        }
+
+        .close-buttons {
+            position:absolute;
+            top: 4px;
+            right: 4px;
+            width: 32px;
+            height: 32px;
+        }
+
+        .item-panel {
+            max-height: 500px;
+            overflow: scroll;
+
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="">
+    <div class="container">
+        <div class="modal is-active" v-if="!initialized">
+            <div class="modal-background"></div>
+            <div class="modal-card p-6">
+                <div class="box">
+                    <h2 class="subtitle">Processing output... if your project is big, hang tight and get something to drink.</h2>
+                    <progress class="progress is-warning" max="100"></progress>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5 pb-6">
+            <h1 class="title is-bold">Comparison Result:</h1>
+            <h2 class="subtitle">Total files: {{totalFiles}}, Unused files: {{unusedFiles}}.</h2>
+        </div>
+
+        <div class="column">
+            <nav class="panel" v-if="unused.length > 0">
+                <p class="panel-heading has-background-grey">Unused Files - {{unused.length}}</p>
+                <div class="item-panel">
+                    <a v-for="(item, index) in unused" class="has-background-grey-dark" @click="openItem(index)">
+                        {{ cleanedOutput(item) }}
+                    </a>
+                </div>
+            </nav>
+            <div v-else class="p-6">
+                <label for="" class="label">No Unused Files Found!</label>
+            </div>
+        </div>
+<!--        <div class="columns">-->
+<!--            <div class="column">-->
+<!--                <nav class="panel">-->
+<!--                    <p class="panel-heading has-background-grey">Project Files</p>-->
+<!--                    <div class="item-panel">-->
+<!--                        <div v-for="item in sortedProject"-->
+<!--                             :class="isUsed(item) === false ? 'panel-block has-background-danger' : 'panel-block has-background-dark'">-->
+<!--                            {{ cleanedOutput(item) }}-->
+<!--                        </div>-->
+<!--                    </div>-->
+<!--                </nav>-->
+<!--            </div>-->
+<!--            <div class="column">-->
+<!--                <nav class="panel">-->
+<!--                    <p class="panel-heading has-background-grey">Cooked Files</p>-->
+<!--                    <div class="item-panel">-->
+<!--                        <div v-for="item in sortedCooked" class="panel-block has-background-dark">{{ cleanedOutput(item) }}</div>-->
+<!--                    </div>-->
+<!--                </nav>-->
+<!--            </div>-->
+<!--        </div>-->
+    </div>
+</div>
+<script src="./node_modules/vue/dist/vue.js"></script>
+<script>
+    const {ipcRenderer} = require("electron")
+    const fs = require("fs")
+    const path = require("path")
+    const eventTypes = require("./eventTypes.json")
+    const max = 20
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            initialized: false,
+            projectFiles: [],
+            cookedFiles: [],
+            unused: [],
+            currentPage: 0,
+        },
+        methods: {
+            openItem: function(index) {
+                let outpath = this.unused[index];
+                let splitPath = outpath.split(/[\\ ]+/)
+                splitPath.pop()
+
+                let finalPath = "";
+
+                for(let i = 0; i < splitPath.length; i++){
+                    finalPath += splitPath[i] + "\\"
+                }
+
+                console.log(finalPath)
+
+                ipcRenderer.send(eventTypes.open_file, {file: finalPath})
+            },
+            isUsed: function(element) {
+                return this.projectFiles.includes(element) && this.cookedFiles.includes(element)
+            },
+            cleanedArray: function(arr) {
+                let sorted = arr
+                return sorted
+            },
+            cleanedOutput: function(path) {
+                if(path === undefined){
+                    return "null"
+                }
+
+                console.log("reading " + path)
+                let maxString = 75
+                return "...\\Content" + path.split("Content")[1]
+                //return "..." + path.slice(path.length - maxString, maxString)
+            },
+            injectData: function(data) {
+                let unused = []
+                let pClean = []
+                let cClean = []
+
+                for (let i = 0; i < data.project.length; i++){
+                    pClean.push(data.project[i].split("Content")[1])
+                }
+
+                for (let i = 0; i < data.cooked.length; i++){
+                    cClean.push(data.cooked[i].split("Content")[1])
+                }
+
+                for (let i = 0; i < pClean.length; i++){
+                    if(cClean.includes(pClean[i])){
+                        continue
+                    }
+
+                    unused.push(data.project[i])
+                }
+
+                this.unused = unused
+                this.projectFiles = data.project
+                this.cookedFiles = data.cooked
+            }
+        },
+        computed: {
+            sortedProject: function () {
+                let arr = this.cookedFiles
+
+                return arr.slice(this.currentPage * max, max)
+            },
+            sortedCooked: function () {
+                return this.cleanedArray(this.cookedFiles)
+            },
+            totalFiles: function () {
+                return this.projectFiles.length
+            },
+            unusedFiles: function () {
+                return this.unused.length
+            }
+        }
+    })
+
+    ipcRenderer.on(eventTypes.funnel_data, (event, args) => {
+        console.dir(args)
+        console.log("funneling data!")
+
+        app.injectData(args)
+        app.initialized = true
+    })
+
+</script>
+</body>
+</html>

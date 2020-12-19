@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" style = 'overflow-y:hidden'>
+<head>
+    <meta charset="UTF-8">
+    <title>Unreal Auto Docs</title>
+    <link rel="stylesheet" href="./node_modules/bulma/css/bulma.css">
+    <link rel="stylesheet" href="./darkly.min.css">
+    <style>
+        body{
+            overflow: hidden;
+        }
+
+        .close-buttons {
+            position:absolute;
+            top: 4px;
+            right: 4px;
+            width: 32px;
+            height: 32px;
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="">
+    <div class="container">
+        <div>
+            <div class="modal is-active" v-if="isProcessing">
+                <div class="modal-background"></div>
+                <div class="modal-card p-6">
+                    <div class="box">
+                        <h2 class="subtitle">{{ currentTask }}</h2>
+                        <progress class="progress is-warning" :value="progress" max="100"></progress>
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 pb-6">
+                <h1 class="title is-bold">Unreal Sous Chef</h1>
+                <h2 class="subtitle">*Click* nioce!</h2>
+            </div>
+
+            <div class="container px-5 m-3">
+                <label class="label">
+                    <strong class="label has-text-danger" v-if="isProjectValid === false">Error: Invalid path!</strong>
+                    <strong class="has-text-success" v-if="isProjectValid">Valid! </strong>
+                    {{ projectDir }}
+                </label>
+
+                <div class="field has-addons is-fullwidth">
+                    <p class="control">
+                        <a class="button is-primary" @click="selectProject">
+                            Project Directory:
+                        </a>
+                    </p>
+                    <div class="control is-expanded"><input @change="updatePaths" class="input is-primary"
+                                                            v-model="projectDir"></div>
+                </div>
+            </div>
+
+            <div class="container px-5 m-3">
+                <label class="label">
+                    <strong class="has-text-success" v-if="isCookedValid">Valid! </strong>{{ cookedDir }}
+                </label>
+                <label class="label has-text-danger" v-if="isCookedValid === false">Error: Invalid path!</label>
+                <div class="field has-addons is-fullwidth">
+                    <p class="control">
+                        <a class="button is-warning" @click="selectCooked">
+                            Cooked Directory:
+                        </a>
+                    </p>
+                    <div class="control is-expanded"><input @change="updatePaths" class="input is-warning"
+                                                            v-model="cookedDir"></div>
+                </div>
+            </div>
+
+            <div class="buttons p-5 m-3" v-if="isCookedValid && isProjectValid">
+                <label class="label has-text-warning">Warning, this could take a while.</label>
+                <button class="button is-warning is-fullwidth" @click="runComparison">Run Comparison</button>
+            </div>
+
+        </div>
+    </div>
+
+
+    <div class="close-buttons">
+        <button id="close-button" class="is-fullwidth is-fullheight button is-danger is-small" onclick="console.log('woop')">x</button>
+    </div>
+</div>
+<script src="./node_modules/vue/dist/vue.js"></script>
+<script>
+    const {ipcRenderer} = require("electron")
+    const fs = require("fs")
+
+    const eventTypes = require("./eventTypes.json")
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            projectDir: '',
+            cookedDir: '',
+            message: 'Hello Vue!',
+            isProcessing: false,
+            currentTask: "none",
+            progress: 0,
+        },
+        methods: {
+            selectProject: function () {
+                ipcRenderer.send(eventTypes.select_project)
+            },
+            selectCooked: function () {
+                ipcRenderer.send(eventTypes.select_cooked)
+            },
+            runComparison: function () {
+                ipcRenderer.send(eventTypes.run_compare)
+            },
+            onProjectChange: function (event) {
+
+            },
+            onCookChange: function (event) {
+            },
+            updatePaths: function() {
+                ipcRenderer.send(eventTypes.selected_folders, {projectDir: this.projectDir, cookedDir: this.cookedDir})
+            }
+        },
+        computed: {
+            isProjectValid: function () {
+                return fs.existsSync(this.projectDir)
+            },
+            isCookedValid: function () {
+                return this.projectDir.includes("Content") && fs.existsSync(this.cookedDir)
+            }
+        }
+    })
+
+    document.getElementById("close-button").addEventListener('click', () => {
+        ipcRenderer.send(eventTypes.close);
+    })
+
+    ipcRenderer.on(eventTypes.update_progress, (ipc, evt) => {
+        app.isProcessing =!evt.hasOwnProperty("finished")
+        app.currentTask = evt.task
+        app.progress = undefined// evt.progress
+    })
+
+    ipcRenderer.on('completedTask', (i, evt) =>{
+        app.isProcessing = false
+    })
+
+    ipcRenderer.on(eventTypes.selected_folders, (i, event) => {
+        app.projectDir = event.projectDir
+        app.cookedDir = event.cookedDir
+    })
+
+</script>
+</body>
+</html>

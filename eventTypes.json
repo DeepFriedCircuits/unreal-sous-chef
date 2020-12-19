@@ -1,0 +1,10 @@
+{
+  "close": "close",
+  "select_project": "select_project",
+  "select_cooked": "select_cooked",
+  "run_compare": "run_compare",
+  "update_progress": "update_progress",
+  "selected_folders": "selected_folders",
+  "funnel_data": "funnel_data",
+  "open_file": "open_file"
+}
